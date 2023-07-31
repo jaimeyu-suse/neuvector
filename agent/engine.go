@@ -1908,6 +1908,11 @@ func taskAddContainer(id string, info *container.ContainerMetaExtra) {
 		}
 	}
 
+	if info.ID == info.Sandbox {
+		log.WithFields(log.Fields{"id": id, "pid": info.Pid}).Debug("Process is a sandbox, can be ignored.")
+		info.Running = false // update it and put a cluster record for the exited container
+	}
+
 	if !isEmptyProcessPod(info) {
 		if !osutil.IsPidValid(info.Pid) {
 			// however, the rootPid was left, an exited container
