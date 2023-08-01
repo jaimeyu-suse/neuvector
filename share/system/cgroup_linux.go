@@ -290,10 +290,11 @@ func getContainerIDByCgroupReaderV2(file io.ReadSeeker, choice int) (string, boo
 	return "", false, false
 }
 
-func getCgroupPathReaderV2(file io.ReadSeeker) string {
+func getCgroupPathReaderV2(file io.ReadSeeker) (string, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		tokens := strings.Split(scanner.Text(), ":")
+		log.WithFields(log.Fields{"tokens": tokens, "text": scanner.Text()}).Error("JAYU READING Cgrup file")
 		if len(tokens) > 2 {
 			// log.WithFields(log.Fields{"cpath": tokens[2]}).Debug()
 			// For k8s, we're looking for kubepods
@@ -302,12 +303,17 @@ func getCgroupPathReaderV2(file io.ReadSeeker) string {
 			// https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/resource_management_guide/sec-default_cgroup_hierarchies
 			// system.slice/docker-53a44c2a8e2bef215199d4c37cc391e1e7caa654f9fb0ac4af29ac9610bbb3f2.scope
 			// https://docs.fedoraproject.org/en-US/quick-docs/understanding-and-administering-systemd/
+			// tokens=[0  /../../kubepods-besteffort-poddee9029c_408f_4466_811d_43eea3042395.slice/docker-da8537d089e7b9ffd5baee193ee10092d185911c7322cb7a7718744a461b1d19.scope]
 			if strings.HasPrefix(tokens[2], "/kubepods") || strings.HasPrefix(tokens[2], "/system.slice") {
-				return filepath.Join("/sys/fs/cgroup", tokens[2])
+				log.WithFields(log.Fields{"path": filepath.Join("/sys/fs/cgroup", tokens[2])}).Error("JAYU  Cgrup file")
+
+				return filepath.Join("/sys/fs/cgroup", tokens[2]), nil
 			}
 		}
 	}
-	return "/sys/fs/cgroup"
+	log.WithFields(log.Fields{}).Error("JAYU no prefix, failing")
+
+	return "/sys/fs/cgroup",errors.New("cgroup v2 path not found")
 }
 
 // cgroup v2 is collected inside an unified file folder
@@ -315,18 +321,50 @@ func getCgroupPath_cgroup_v2(pid int) (string, error) {
 	var path string
 	if pid == 0 { // self
 		path = "/proc/self/cgroup"
+		log.WithFields(log.Fields{"pid": pid, "path": path}).Warning("is pid 0")
+
 	} else {
 		path = filepath.Join("/proc", strconv.Itoa(pid), "cgroup")
+		log.WithFields(log.Fields{"pid": pid, "path": path}).Warning("not pid 0")
+
 	}
+	log.WithFields(log.Fields{"pid": pid, "path": path, }).Warning("opening cgorup file")
 
 	f, err := os.Open(path)
 	if err != nil {
-		log.WithFields(log.Fields{"path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
+		log.WithFields(log.Fields{"pid": pid, "path": path, "err": err}).Warning("cgroup cannot be read, stats cannot be found")
 		return "", err
 	}
 	defer 	f.Close()
 
-	cpath := getCgroupPathReaderV2(f)
+	cpath, cerr := getCgroupPathReaderV2(f)
+
+	if cerr != nil {
+		// Check if the path is actually /proc/4139/root/sys/fs/cgroup
+		newCpath := filepath.Join("/proc", strconv.Itoa(pid), "root/sys/fs/cgroup")
+		newCpathCpu := filepath.Join(newCpath, "cpu.stat")
+		newCpathMemory := filepath.Join(newCpath, "memory.stat")
+		cpath = newCpath
+		_, err := os.Stat(newCpathCpu)
+		if err != nil {
+			log.WithFields(log.Fields{"pid": pid, "path": path, "err": err,
+				"cpath": cpath,
+			"newCpathCpu":newCpathCpu,
+			"newCpathMemory": newCpathMemory,
+			}).Warning("cgroup cpu.stat not exist")
+			cpath = "/sys/fs/cgroup"
+		}
+		_, err = os.Stat(newCpathMemory)
+		if err != nil {
+			log.WithFields(log.Fields{"pid": pid, "path": path, "err": err,
+				"cpath": cpath,
+				"newCpathCpu":newCpathCpu,
+				"newCpathMemory": newCpathMemory,}).Warning("cgroup memory.current not exist")
+			cpath = "/sys/fs/cgroup"
+		}
+	}
+
+	log.WithFields(log.Fields{"pid": pid, "path": path, "cpath": cpath}).Error("JAYU cgroup is ")
 
 	return cpath, nil
 
@@ -347,8 +385,11 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 		// It is a well-known path: /proc/<pid>/root/sys/fs/cgroup/<subsystem>
 		if pid == 0 { // self
 			path = filepath.Join("/sys/fs/cgroup", subsystem)
+			log.WithFields(log.Fields{"pid": pid, "path": path}).Error("JAYU cgroup v1 subsystem")
 		} else {
 			path = filepath.Join(s.procDir, strconv.Itoa(pid), "root/sys/fs/cgroup", subsystem)
+			log.WithFields(log.Fields{"pid": pid, "path": path}).Error("JAYU cgroup v2 subsystem")
+
 		}
 		return path, nil
 
@@ -359,6 +400,8 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 
 	// However, the k8s POD does not have those subsystem folders
 	path = filepath.Join(s.procDir, strconv.Itoa(pid), "cgroup")
+	log.WithFields(log.Fields{"pid": pid, "path": path}).Error("JAYU opening path")
+
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -370,6 +413,8 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 		if strings.Contains(scanner.Text(), subsystem) {
 			tokens := strings.Split(scanner.Text(), ":")
 			length := len(tokens)
+			log.WithFields(log.Fields{"pid": pid, "path": path, "tokens": tokens}).Error("JAYU tokenss")
+
 			if length == 3 {
 				path := filepath.Join(s.cgroupDir, subsystem, tokens[2])
 				if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -380,6 +425,8 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 					}
 				} else {
 					// Most other systems
+					log.WithFields(log.Fields{"pid": pid, "path": path, "tokens": tokens}).Error("JAYU no splits")
+
 					return path, nil
 				}
 			} else if length > 3 {
@@ -393,6 +440,8 @@ func (s *SystemTools) GetContainerCgroupPath(pid int, subsystem string) (string,
 						path += ":" + tokens[i]
 					}
 				}
+				log.WithFields(log.Fields{"pid": pid, "path": path, "tokens": tokens}).Error("JAYU lenght >3")
+
 				return path, nil
 			}
 			break
@@ -518,11 +567,12 @@ func getMemoryData(path, name string) (MemoryData, error) {
 func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFullSet bool) error {
 	// Set stats from memory.stat.
 	filePath := filepath.Join(path, "memory.stat")
+	log.WithFields(log.Fields{"filePath": filePath}).Error("OPENING CGROUP FILE")
 	statsFile, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			log.WithFields(log.Fields{"filePath": filePath, "systemtools": *s, "error": err}).Error("Could not find memory stats file")
-			return nil
+			//return nil
 		}
 		return err
 	}

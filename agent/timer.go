@@ -208,9 +208,25 @@ func updateAgentStats(cpuSystem uint64) {
 
 func updateContainerStats(cpuSystem uint64) {
 	for _, c := range gInfo.activeContainers {
-		mem, _ := global.SYS.GetContainerMemoryUsage(c.cgroupMemory)
-		cpu, _ := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct)
-		system.UpdateStats(&c.stats, mem, cpu, cpuSystem)
+
+
+		var uc, um uint64
+		//var err error
+		if mem, err := global.SYS.GetContainerMemoryUsage(c.cgroupMemory); err != nil {
+			log.WithFields(log.Fields{"Container": c, "error": err.Error(), "metaInfo": c.info}).Error("mem stats error")
+		} else {
+			um = mem
+		}
+		if cpu, err := global.SYS.GetContainerCPUUsage(c.cgroupCPUAcct); err != nil {
+			log.WithFields(log.Fields{"Container": c, "error": err.Error(), "metaInfo": c.info}).Error("CPU stats error")
+		} else {
+			uc = cpu
+		}
+
+		log.WithFields(log.Fields{"Container": c, "metaInfo": c.info,
+			"cpu": uc, "mem": um, "cpusystem": cpuSystem}).Error("Dumping container information")
+
+		system.UpdateStats(&c.stats, um, uc, cpuSystem)
 	}
 }
 

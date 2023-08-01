@@ -1,3 +1,3 @@
 all:
 	# go build --ldflags '-extldflags "-static"'
-	go build -ldflags='-s -w'
+	go build #-ldflags='-s -w'

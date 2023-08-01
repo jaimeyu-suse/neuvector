@@ -1211,6 +1211,8 @@ func fillContainerProperties(c *containerData, parent *containerData,
 	c.upperDir, c.rootFs, _ = lookupContainerLayerPath(c.pid, c.id)
 	c.propertyFilled = true
 	log.WithFields(log.Fields{"uppDir": c.upperDir, "rootFs": c.rootFs, "id": c.id}).Debug()
+	log.WithFields(log.Fields{"c.cgroupMemory": c.cgroupMemory,
+		"c.cgroupCPUAcct": c.cgroupCPUAcct, "id": c.id, "c": c}).Error("JAYU dumping cgroup paths")
 }
 
 func handleNetworkDelete(netID string) {

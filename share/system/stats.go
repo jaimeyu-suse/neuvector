@@ -1,14 +1,18 @@
 package system
 
 import (
+	log "github.com/sirupsen/logrus"
 	"time"
 
 	"github.com/neuvector/neuvector/share"
 )
 
 func calculateCPU(prevCPU, prevCPUSystem uint64, cpu, cpuSystem uint64) float64 {
+
 	var cDelta float64 = float64(cpu - prevCPU)
 	var sDelta float64 = float64(cpuSystem - prevCPUSystem)
+
+	log.WithFields(log.Fields{"prevCPU": prevCPU, "cpu": prevCPU, "cDelta": cDelta, "sDelta": sDelta}).Error("Dumping cpu calcs")
 
 	if sDelta > 0.0 {
 		if cDelta > sDelta {
@@ -28,6 +32,8 @@ func UpdateStats(cs *share.ContainerStats, memory, cpu, cpuSystem uint64) {
 
 	cs.ReadAt = time.Now().UTC()
 	cs.Cpu[cs.CurSlot] = ratio
+
+
 	cs.Memory[cs.CurSlot] = memory
 
 	cs.CurSlot++
