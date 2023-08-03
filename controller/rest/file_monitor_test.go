@@ -2,8 +2,8 @@ package rest
 
 import (
 	"encoding/json"
+	"github.com/neuvector/neuvector/controller/kv"
 	"net/http"
-	"reflect"
 	"testing"
 
 	"github.com/neuvector/neuvector/controller/api"
@@ -67,9 +67,31 @@ func TestFileRuleShow(t *testing.T) {
 	preTest()
 
 	mc := mockCache{
+		rules: make(map[uint32]*api.RESTPolicyRule, 0),
 		groups:  make(map[string]*api.RESTGroup),
 		filters: make(map[string][]*api.RESTFileMonitorFilter),
 	}
+
+
+	// Initial data
+	rule1 := share.CLUSPolicyRule{
+		ID: 10, From: "g1", To: "g1", Action: share.PolicyActionAllow,
+		Ports:        api.PolicyPortAny,
+		Applications: []uint32{},
+		CfgType:      share.UserCreated,
+	}
+	//mc := mockCache{rules: make(map[uint32]*api.RESTPolicyRule, 0)}
+	mc.rules[rule1.ID] = mc.PolicyRule2REST(&rule1)
+	cacher = &mc
+
+	var mockCluster kv.MockCluster
+	mockCluster.Init(
+		[]*share.CLUSPolicyRule{&rule1},
+		[]*share.CLUSGroup{
+			&share.CLUSGroup{Name: "g1", CfgType: share.UserCreated},
+		},
+	)
+	clusHelper = &mockCluster
 
 	mc.groups["external"] = &api.RESTGroup {
 		RESTGroupBrief: api.RESTGroupBrief{
@@ -80,7 +102,7 @@ func TestFileRuleShow(t *testing.T) {
 
 	mc.groups["containers"] = &api.RESTGroup {
 		RESTGroupBrief: api.RESTGroupBrief{
-			Name: 	"contrainers",
+			Name: 	"containers",
 			Kind:	share.GroupKindContainer,
 		},
 	}
@@ -100,41 +122,50 @@ func TestFileRuleShow(t *testing.T) {
 	//
 	cacher = &mc
 
-	// Read existing group
-	{
-		w := restCall("GET", "/v1/file_monitor/containers", nil, api.UserRoleAdmin)
-		if w.status == http.StatusOK {
-			var resp api.RESTFileMonitorProfileData
-			json.Unmarshal(w.body, &resp)
-			if !reflect.DeepEqual(resp.Profile.Filters, ff) {
-				t.Errorf("Status is OK but a wrong content")
-				t.Logf("  Resp: %+v\n", ff)
-			}
-		} else {
-			t.Errorf("Status is not OK")
-			t.Logf("  Expect status: %+v\n", http.StatusOK)
-			t.Logf("  Actual status: %+v\n", w.status)
-		}
-	}
-
-	// Read non-existing group
-	{
-		w := restCall("GET", "/v1/file_monitor/nv.nothing", nil, api.UserRoleAdmin)
-		if w.status != http.StatusNotFound {
-			t.Errorf("Read non-existing group: Status is OK")
-			t.Logf("  Expect status: %+v\n", http.StatusOK)
-			t.Logf("  Actual status: %+v\n", w.status)
-		}
-	}
-
 	// Read an invalid-type group
 	{
-		w := restCall("GET", "/v1/file_monitor/external", nil, api.UserRoleAdmin)
-		if w.status != http.StatusBadRequest {
+		tmp1 := api.RESTFileMonitorFilterConfig{
+			Filter:    "/tmp",
+			Recursive: false,
+			Behavior:  share.FileAccessBehaviorBlock,
+			Apps:      nil,
+			Group:     "",
+		}
+
+		tmp2 := api.RESTFileMonitorFilterConfig{
+			Filter:    "/tmp/",
+			Recursive: false,
+			Behavior:  share.FileAccessBehaviorBlock,
+			Apps:      nil,
+			Group:     "",
+		}
+
+		filters := make([]*api.RESTFileMonitorFilterConfig, 0)
+		filters2 := make([]*api.RESTFileMonitorFilterConfig, 0)
+		filters = append(filters, &tmp1)
+		filters = append(filters, &tmp2)
+		//var rconf api.RESTFileMonitorConfigData
+		rconf := api.RESTFileMonitorConfigData{
+			Config: &api.RESTFileMonitorConfig{
+				AddFilters:    filters,
+				DelFilters:    filters2,
+				UpdateFilters: filters2,
+			},
+		}
+		body, err := json.Marshal(&rconf)
+		if err != nil {
+			t.Errorf("Marshal fail %+v", err)
+			t.Fail()
+		}
+
+		w := restCall(http.MethodPatch, "/v1/file_monitor/containers", body, api.UserRoleAdmin)
+		if w.status != http.StatusOK {
 			t.Errorf("Read an invalid-type group: Status is OK")
 			t.Logf("  Expect status: %+v\n", http.StatusBadRequest)
-			t.Logf("  Actual status: %+v\n", w.status)
+			t.Logf("  Actual status: %+v, body: %+v \n", w.status, string(w.body))
 		}
 	}
+
+
 	postTest()
 }

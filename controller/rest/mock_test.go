@@ -72,6 +72,17 @@ type mockCache struct {
 	pwdProfiles      map[string]*share.CLUSPwdProfile
 	activePwdProfile string
 }
+//
+//func (m *mockCache) GetFileMonitorProfile(name string, acc *access.AccessControl, customer bool) (*api.RESTFileMonitorProfile, error) {
+//	restprof := &api.RESTFileMonitorProfile{}
+//
+//	return restprof, nil
+//}
+
+
+func (m *mockCache) AuthorizeFileMonitorProfile(name string, acc *access.AccessControl) bool {
+	return true
+}
 
 func (m *mockCache) Group2CLUS(group *api.RESTGroup) *share.CLUSGroup {
 	c := share.CLUSGroup{
@@ -563,6 +574,8 @@ func initTest() {
 	router.DELETE("/v1/group/:name", handlerGroupDelete)
 
 	router.GET("/v1/file_monitor/:name", handlerFileMonitorShow)
+	router.PATCH("/v1/file_monitor/:name", handlerFileMonitorConfig)
+
 	router.GET("/v1/process_profile/:name", handlerProcessProfileShow)
 	router.PATCH("/v1/process_profile/:name", handlerProcessProfileConfig)
 
