@@ -1211,7 +1211,6 @@ func fillContainerProperties(c *containerData, parent *containerData,
 
 	if _, err := global.SYS.GetContainerMemoryUsage(c.cgroupMemory); err != nil {
 		log.WithFields(log.Fields{"cgroupMemory": c.cgroupMemory, "pid": c.pid, "id": c.id, "error": err}).Warning("Could not get memory stats.")
-
 		c.cgroupMemory = ""
 
 	}

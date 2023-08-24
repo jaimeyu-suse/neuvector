@@ -295,6 +295,7 @@ func getCgroupPathReaderV2(file io.ReadSeeker) string {
 	for scanner.Scan() {
 		tokens := strings.Split(scanner.Text(), ":")
 		if len(tokens) > 2 {
+			// log.WithFields(log.Fields{"cpath": tokens[2]}).Debug()
 			// For k8s, we're looking for kubepods
 			// example: "0::/kubepods/besteffort/podad1189b4-15b6-4ee5-b509-084defdd5c70/f459165f653a853823b2807f22e5b21c4214ff1d89e71790ca28da9b38695ea1"
 			// For systemd based OS, we're looking for system.slice and we're in cgroup v2
@@ -306,8 +307,7 @@ func getCgroupPathReaderV2(file io.ReadSeeker) string {
 			}
 		}
 	}
-	// Return empty path so values are zero'd out.
-	return ""
+	return "/sys/fs/cgroup"
 }
 
 // cgroup v2 is collected inside an unified file folder
@@ -521,8 +521,8 @@ func (s *SystemTools) getMemoryStats(path string, mStats *CgroupMemoryStats, bFu
 	statsFile, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			message := log.WithFields(log.Fields{"filePath": filePath, "systemtools": *s, "error": err}).Message
-			return fmt.Errorf(message)
+			log.WithFields(log.Fields{"filePath": filePath, "systemtools": *s, "error": err}).Error("Could not find memory stats file")
+			return nil
 		}
 		return err
 	}
@@ -1202,6 +1202,4 @@ func (s *SystemTools) ReCalculateMemoryMetrics(threshold uint64) {
 
 // verify the cgroup's memory controller
 // cgroup v2 is a unified file system, it does not have the memory folder
-func (s *SystemTools) GetCgroupVersion() int {
-	return s.cgroupVersion
-}
+func (s *SystemTools) GetCgroupVersion(
