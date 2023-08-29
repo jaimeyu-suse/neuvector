@@ -13,15 +13,15 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/neuvector/neuvector/agent/dp"
 	"github.com/neuvector/neuvector/agent/policy"
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
+	"github.com/neuvector/neuvector/share/container"
 	"github.com/neuvector/neuvector/share/fsmon"
 	"github.com/neuvector/neuvector/share/global"
 	"github.com/neuvector/neuvector/share/utils"
-	"github.com/neuvector/neuvector/share/container"
+	log "github.com/sirupsen/logrus"
 )
 
 var policyApplyDir int
@@ -1164,13 +1164,15 @@ var groupMux sync.RWMutex
 var groups map[string]*groupProfile = make(map[string]*groupProfile)
 
 func systemConfigGroup(nType cluster.ClusterNotifyType, key string, value []byte) {
-	//	log.WithFields(log.Fields{"value": string(value), "key": key}).Debug("GRP:")
+	//log.WithFields(log.Fields{"value": string(value), "key": key}).Debug("JAYU GRP: dumping")
 	name := share.CLUSProfileKey2Name(key)
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		var grp share.CLUSGroup
 		json.Unmarshal(value, &grp)
 		updateGroupProfileCache(nType, name, grp)
+
+		log.WithFields(log.Fields{"Group": grp, "key": key}).Error("JAYU GRP: dumping")
 
 		// scripts
 		groupMux.Lock()
@@ -1183,6 +1185,10 @@ func systemConfigGroup(nType cluster.ClusterNotifyType, key string, value []byte
 		gp.group = &grp
 		if gp.script != nil {
 			bench.triggerContainerCustomCheck()
+			log.WithFields(log.Fields{
+				"Group": grp,
+				"scriptTimerStart": scriptTimerStart,
+				"key": key}).Error("JAYU rrestarting customConTimer timer")
 		}
 
 	case cluster.ClusterNotifyDelete:
@@ -1211,7 +1217,7 @@ func systemConfigScript(nType cluster.ClusterNotifyType, key string, value []byt
 	name := share.CLUSProfileKey2Name(key)
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
-		log.WithFields(log.Fields{"value": string(value), "key": key}).Debug("")
+		log.WithFields(log.Fields{"value": string(value), "key": key}).Error("JAYU DEBUG")
 
 		groupMux.Lock()
 		defer groupMux.Unlock()
@@ -1235,6 +1241,10 @@ func systemConfigScript(nType cluster.ClusterNotifyType, key string, value []byt
 			bench.triggerHostCustomCheck(&script)
 		} else if gp.group.Kind == share.GroupKindContainer {
 			bench.triggerContainerCustomCheck()
+			log.WithFields(log.Fields{
+				"script": script,
+				"scriptTimerStart": scriptTimerStart,
+				"key": key}).Error("JAYU rrestarting customConTimer timer")
 		}
 	case cluster.ClusterNotifyDelete:
 		groupMux.Lock()
