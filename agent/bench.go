@@ -275,6 +275,8 @@ func (b *Bench) BenchLoop() {
 
 			b.doKubeBench(masterScript, workerScript, remediation)
 		case <-b.conTimer.C:
+			log.WithFields(log.Fields{}).Error("Timer conTimer.C triggered Container Benchmarking")
+
 			containers := b.cloneAllNewContainers()
 			if agentEnv.autoBenchmark {
 				if Host.CapDockerBench {
@@ -302,9 +304,13 @@ func (b *Bench) BenchLoop() {
 				}
 			}
 			gInfoRUnlock()
+			log.WithFields(log.Fields{"wls":wls,}).Error("Timer conTimer.C triggered custom stript")
 
 			b.doContainerCustomCheck(wls)
+			log.WithFields(log.Fields{}).Error("Timer conTimer.C done")
 		case <-b.customConTimer.C:
+			log.WithFields(log.Fields{}).Error("Timer customConTimer.C triggered ")
+
 			wls := make([]*share.CLUSWorkload, 0)
 			gInfoRLock()
 			for _, c := range gInfo.activeContainers {
@@ -314,8 +320,11 @@ func (b *Bench) BenchLoop() {
 				wls = append(wls, createWorkload(c.info, &c.service, &c.domain))
 			}
 			gInfoRUnlock()
+			log.WithFields(log.Fields{"wls":wls,}).Error("customConTimer.C Timer triggered custom stript")
 
 			b.doContainerCustomCheck(wls)
+			log.WithFields(log.Fields{}).Error("Timer customConTimer.C done ")
+
 		case <-b.customHostTimer.C:
 			b.doHostCustomCheck()
 		}
@@ -383,6 +392,7 @@ func (b *Bench) AddContainer(id, name string) {
 	b.allContainers.Add(id)
 	b.newContainers[id] = name
 	b.conTimer.Reset(containerTimerStart)
+	log.Error("Restarting conTimer timer")
 }
 
 func (b *Bench) RemoveContainer(id string) {
@@ -392,6 +402,7 @@ func (b *Bench) RemoveContainer(id string) {
 	b.allContainers.Remove(id)
 	delete(b.newContainers, id)
 	b.conTimer.Reset(containerTimerStart)
+	log.Error("Restarting conTimer timer")
 
 	// TODO: delete existing keys
 }
@@ -418,6 +429,7 @@ func (b *Bench) RerunDocker(forced bool) {
 		b.logBenchFailure(benchPlatDocker, share.BenchStatusNotSupport)
 		b.putBenchReport(Host.ID, share.BenchDockerHost, nil, share.BenchStatusNotSupport)
 	} else {
+		log.Error("Restarting conTimer hostTimerStart timer")
 		b.hostTimer.Reset(hostTimerStart)
 		b.conTimer.Reset(containerTimerStart)
 		b.putBenchReport(Host.ID, share.BenchDockerHost, nil, share.BenchStatusScheduled)
@@ -866,9 +878,10 @@ func (b *Bench) getContainerItems(cname string, list []*benchItem) ([]*benchItem
 }
 
 func (b *Bench) doContainerCustomCheck(wls []*share.CLUSWorkload) {
-	log.Debug("")
+	log.Error("workload")
 
 	for _, wl := range wls {
+		log.WithFields(log.Fields{"workload": wl}).Error("JAYU dumping workload")
 		if items := b.runCustomScript(wl); len(items) > 0 {
 			b.mux.Lock()
 			if b.allContainers.Contains(wl.ID) {
@@ -888,11 +901,13 @@ func (b *Bench) doContainerCustomCheck(wls []*share.CLUSWorkload) {
 		}
 	}
 
-	log.Debug("Running benchmark checks done")
+	log.Error("Running benchmark checks done")
 }
 
 func (b *Bench) doHostCustomCheck() {
 	log.Debug("")
+	log.WithFields(log.Fields{}).Error("start run host script")
+
 
 	b.mux.Lock()
 	scripts := b.hostScript.Scripts
@@ -901,7 +916,7 @@ func (b *Bench) doHostCustomCheck() {
 	items := make([]*benchItem, 0)
 	for _, s := range scripts {
 		ret, msg, err := b.runScript(s.Script, 1)
-		log.WithFields(log.Fields{"Script": s.Name, "msg": msg}).Debug("run host script")
+		log.WithFields(log.Fields{"Script": s.Name, "msg": msg}).Error("run host script")
 
 		item := &benchItem{
 			testNum: s.Name,
@@ -977,6 +992,12 @@ func (b *Bench) runDockerContainerBench(containers map[string]string) ([]byte, e
 }
 
 func (b *Bench) runCustomScript(wl *share.CLUSWorkload) []*benchItem {
+
+
+	log.WithFields(log.Fields{
+		"wl": *wl,
+	}).Error("JAYU Running script")
+
 	items := make([]*benchItem, 0)
 	grpScripts := make(map[string]*share.CLUSCustomCheckGroup, 0)
 	groupMux.Lock()
@@ -987,13 +1008,18 @@ func (b *Bench) runCustomScript(wl *share.CLUSWorkload) []*benchItem {
 	}
 	groupMux.Unlock()
 
+	log.WithFields(log.Fields{
+		"wl": *wl,
+		"groups": groups,
+	}).Error("JAYU dumping groups")
+
 	for grpName, script := range grpScripts {
-		log.WithFields(log.Fields{"name": wl.Name, "group": grpName, "script": script}).Debug("selected")
+		log.WithFields(log.Fields{"name": wl.Name, "group": grpName, "script": script}).Error("selected Scripts")
 
 		for _, s := range script.Scripts {
 			ret, msg, err := b.runScript(s.Script, wl.Pid)
 			msg = strings.TrimRight(msg, "\r\n")
-			log.WithFields(log.Fields{"Script": s.Name, "name": wl.Name, "msg": msg, "err": err}).Debug("run script")
+			log.WithFields(log.Fields{"Script": s.Name, "name": wl.Name, "msg": msg, "err": err}).Error("Finishing running script")
 
 			item := &benchItem{
 				testNum: s.Name,
@@ -1061,7 +1087,7 @@ func (b *Bench) runScript(script string, pid int) (bool, string, error) {
 	global.SYS.AddToolProcess(pgid, pid, "run-script", file.Name())
 
 	go func() {
-		log.WithFields(log.Fields{"args": args, "pgid": pgid, "pid": pid}).Debug("Running custom check script")
+		log.WithFields(log.Fields{"args": args, "pgid": pgid, "pid": pid}).Error("Running custom check script")
 		err := cmd.Wait()
 		if errb.Len() > 0 {
 			msg = errb.String()
@@ -1074,6 +1100,8 @@ func (b *Bench) runScript(script string, pid int) (bool, string, error) {
 		b.childCmd = nil
 		global.SYS.RemoveToolProcess(pgid, false)
 		if err == nil {
+			log.WithFields(log.Fields{"file": file, "pid": pid}).Error("Finished custom check script")
+
 			return true, msg, nil
 		} else {
 			if ee, ok := err.(*exec.ExitError); ok {
@@ -1081,6 +1109,7 @@ func (b *Bench) runScript(script string, pid int) (bool, string, error) {
 					if msg == "" {
 						msg = fmt.Sprintf("%s: status=%d, error=%s", share.CustomScriptFailedPrefix, status, err.Error())
 					}
+					log.WithFields(log.Fields{"file": file, "msg": msg, "pid": pid}).Error("Abonormal finish custom check script")
 					return false, msg, nil
 				}
 			}
@@ -1121,8 +1150,19 @@ func (b *Bench) putBenchReport(id string, bench share.BenchType, items []*benchI
 		}
 	}
 
+
+
 	value, _ := json.Marshal(&report)
 	zb := utils.GzipBytes(value)
+
+	if bench != share.BenchKubeWorker {
+		log.WithFields(log.Fields{
+			"id":     id,
+			"report": string(value),
+			"bench":  bench,
+			"key":    key,
+		}).Error("JAYU pushing workload up")
+	}
 	if err := cluster.PutBinary(key, zb); err != nil {
 		log.WithFields(log.Fields{"error": err}).Error("")
 	}
@@ -1138,6 +1178,13 @@ func (b *Bench) putBenchReport(id string, bench share.BenchType, items []*benchI
 		value, _ = json.Marshal(&share.CLUSBenchState{RunAt: now})
 		cluster.PutBinary(key, value)
 	}
+
+	log.WithFields(log.Fields{
+		"id": id,
+		//"report": string(value),
+		"bench": bench,
+		"key": key,
+	}).Error("JAYU pushing done")
 }
 
 //the script may use several command like grep netstat, check whether they exist in host
@@ -1597,4 +1644,3 @@ func (t *TaskScanner) addScanTask(rootPid int, name, id, group string) {
 	t.queue = append(t.queue, task)
 	t.lock.Unlock()
 }
-                                                                                                                                                                                                                                                  
