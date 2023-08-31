@@ -5,6 +5,7 @@ import "C"
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -2236,7 +2237,7 @@ func containerTaskWorker(probeChan chan *probe.ProbeMessage, fsmonChan chan *fsm
 			}
 		case task := <-ContainerTaskChan:
 			taskName := ContainerTaskName[task.task]
-			log.WithFields(log.Fields{"task": taskName, "id": task.id}).Debug("Task received")
+			log.WithFields(log.Fields{"task": taskName, "id": task.id, "task.task": task.task}).Error("Task received")
 
 			switch task.task {
 			case TASK_ADD_CONTAINER:
@@ -2256,13 +2257,23 @@ func containerTaskWorker(probeChan chan *probe.ProbeMessage, fsmonChan chan *fsm
 			case TASK_APP_UPDATE_FROM_DP:
 				taskAppUpdateByMAC(task.mac, task.apps)
 			case TASK_CONFIG_AGENT:
+				log.WithFields(log.Fields{"TASK_CONFIG_AGENT": TASK_CONFIG_AGENT, "task": taskName, "id": task.id}).Error("JAYU DEBUG handling TASK_CONFIG_AGENT change update")
+
 				taskConfigAgent(task.agentConf)
 			case TASK_CONFIG_SYSTEM:
+				js, _ := json.Marshal(task)
+				log.WithFields(log.Fields{"TASK_CONFIG_SYSTEM": TASK_CONFIG_SYSTEM, "task": taskName,
+					"id": task.id,
+					"pid": task.pid,
+					"tasktask": js,
+					"handler": reflect.TypeOf(task.taskData),
+					"handlerPointing": task.taskData.handler,
+				}).Error("JAYU DEBUG handling TASK_CONFIG_SYSTEM change update")
 				task.taskData.handler()
 			case TASK_EXIT:
 			}
 
-			log.WithFields(log.Fields{"task": taskName, "id": task.id}).Debug("Task done")
+			log.WithFields(log.Fields{"task": taskName, "id": task.id, "task.task": task.task}).Error("Task Done")
 
 		case pmsg := <-probeChan:
 			msgName := probe.ProbeMsgName[pmsg.Type]

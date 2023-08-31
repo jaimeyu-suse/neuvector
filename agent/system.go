@@ -149,6 +149,9 @@ func systemConfigProc(nType cluster.ClusterNotifyType, key string, value []byte)
 	switch nType {
 	case cluster.ClusterNotifyAdd, cluster.ClusterNotifyModify:
 		log.WithFields(log.Fields{"value": string(value)}).Debug("")
+		log.WithFields(log.Fields{
+			"key": key,
+			"value": string(value)}).Error("JAYU DEBUG config network")
 
 		var conf share.CLUSSystemConfig
 		json.Unmarshal(value, &conf)
@@ -302,6 +305,7 @@ func systemConfigPolicy(nType cluster.ClusterNotifyType, key string, value []byt
 
 func systemUpdatePolicy(s share.CLUSGroupIPPolicyVer) bool {
 	// log.WithFields(log.Fields{"ver": s.PolicyIPRulesVersion}).Debug()
+	log.WithFields(log.Fields{"data": s}).Error("JAYU dumping network system update policy")
 	groupIPPolicy := systemConfigPolicyVersion(s)
 	if len(groupIPPolicy) == 0 {
 		if pe.NetworkPolicy == nil {
@@ -347,7 +351,7 @@ func systemUpdatePolicy(s share.CLUSGroupIPPolicyVer) bool {
 
 		log.WithFields(log.Fields{
 			"containers": hostPolicyChangeSet,
-		}).Debug("notify host mode container policy change")
+		}).Error("notify host mode container policy change")
 
 		prober.NotifyPolicyChange(hostPolicyChangeSet)
 		if prober.IsConnectionMonitored() == false {
@@ -485,8 +489,17 @@ func networkDerivedProc(nType cluster.ClusterNotifyType, key string, value []byt
 
 func profileDerivedProc(nType cluster.ClusterNotifyType, key string, value []byte) {
 	which := share.CLUSNetworkKey2Subject(key)
-	value, _ = utils.UnzipDataIfValid(value)
+	var err bool
+	value, err = utils.UnzipDataIfValid(value)
+
 	// log.WithFields(log.Fields{"key": key}).Debug("GRP:")
+	log.WithFields(log.Fields{
+		"which": which,
+		"type": cluster.ClusterNotifyName[nType],
+		"key": key,
+		"value zipped": err,
+	"value": string(value)}).Error("GRP: JAYU")
+
 	switch which {
 	case share.ProfileGroup:
 		systemConfigGroup(nType, key, value)
@@ -499,7 +512,7 @@ func profileDerivedProc(nType cluster.ClusterNotifyType, key string, value []byt
 	case share.ProfileScript:
 		systemConfigScript(nType, key, value)
 	default:
-		log.WithFields(log.Fields{"derived": which}).Debug("Miss handler")
+		log.WithFields(log.Fields{"derived": which}).Error("Miss handler")
 	}
 }
 
@@ -1089,14 +1102,17 @@ func dlpConfigRuleVersion(nType cluster.ClusterNotifyType, key string, value []b
 }
 
 func systemUpdateProc(nType cluster.ClusterNotifyType, key string, value []byte) {
-	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Debug("GRP: ")
+	log.WithFields(log.Fields{"type": cluster.ClusterNotifyName[nType], "key": key}).Error("JAYU GRP: ")
 	store := share.CLUSKey2Target(key) + "/"
 	switch store {
 	case share.CLUSNetworkStore:
 		networkDerivedProc(nType, key, value)
 	case share.CLUSNodeStore:
 		profileDerivedProc(nType, share.CLUSNodeProfileSubkey(key), value)
+	default:
+		log.WithFields(log.Fields{"store": store, "type": cluster.ClusterNotifyName[nType], "key": key}).Error("JAYU GRP: SKIPPED store")
 	}
+
 }
 
 type systemConfigTask struct {
@@ -1107,18 +1123,30 @@ type systemConfigTask struct {
 
 // This is run in task thread context
 func (p *systemConfigTask) handler() {
+	log.WithFields(log.Fields{"nType": p.nType, "key": p.key,}).Error("JAYU Creating task for TASK_CONFIG_SYSTEM")
 	systemUpdateProc(p.nType, p.key, p.value)
+	log.WithFields(log.Fields{"nType": p.nType, "key": p.key,}).Error("JAYU Done Handlers")
 }
 
 func systemUpdateHandler(nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
-	// log.WithFields(log.Fields{"nType": nType, "key": key}).Debug()
+	log.WithFields(log.Fields{"nType": nType, "key": key,}).Error("JAYU Creating task for TASK_CONFIG_SYSTEM")
 	configTask := &systemConfigTask{
 		nType: nType,
 		key:   key,
 		value: value,
 	}
+
+	log.WithFields(log.Fields{"configTask.nType": configTask.nType,
+		"configTask.key": configTask.key,}).Error("JAYU Done creating configTask for TASK_CONFIG_SYSTEM")
+
 	task := ContainerTask{task: TASK_CONFIG_SYSTEM, taskData: configTask}
+	log.WithFields(log.Fields{"task.id": task.id, "task.taskData": task.taskData}).Error("JAYU Done creating task for TASK_CONFIG_SYSTEM")
+
 	ContainerTaskChan <- &task
+	myvalue, _ := utils.UnzipDataIfValid(value)
+	log.WithFields(log.Fields{"myvalue": string(myvalue),
+		"handlerPointing": task.taskData.handler,}).Error("JAYU unzip the file")
+
 }
 
 func systemConfigFileMonitor(nType cluster.ClusterNotifyType, key string, value []byte) {
@@ -1247,6 +1275,7 @@ func systemConfigScript(nType cluster.ClusterNotifyType, key string, value []byt
 				"key": key}).Error("JAYU rrestarting customConTimer timer")
 		}
 	case cluster.ClusterNotifyDelete:
+		log.WithFields(log.Fields{"value": string(value), "key": key}).Error("JAYU DEBUG DELETING KEY")
 		groupMux.Lock()
 		delete(groups, name)
 		groupMux.Unlock()

@@ -309,6 +309,7 @@ func (b *Bench) BenchLoop() {
 			b.doContainerCustomCheck(wls)
 			log.WithFields(log.Fields{}).Error("Timer conTimer.C done")
 		case <-b.customConTimer.C:
+
 			log.WithFields(log.Fields{}).Error("Timer customConTimer.C triggered ")
 
 			wls := make([]*share.CLUSWorkload, 0)
@@ -324,7 +325,8 @@ func (b *Bench) BenchLoop() {
 
 			b.doContainerCustomCheck(wls)
 			log.WithFields(log.Fields{}).Error("Timer customConTimer.C done ")
-
+			//log.WithFields(log.Fields{}).Error("Timer customConTimer.C reset ")
+			//b.customConTimer.Reset(scriptTimerStart)
 		case <-b.customHostTimer.C:
 			b.doHostCustomCheck()
 		}
@@ -1106,10 +1108,12 @@ func (b *Bench) runScript(script string, pid int) (bool, string, error) {
 		} else {
 			if ee, ok := err.(*exec.ExitError); ok {
 				if status := global.SYS.GetExitStatus(ee); status != 0 {
+
 					if msg == "" {
 						msg = fmt.Sprintf("%s: status=%d, error=%s", share.CustomScriptFailedPrefix, status, err.Error())
 					}
-					log.WithFields(log.Fields{"file": file, "msg": msg, "pid": pid}).Error("Abonormal finish custom check script")
+					log.WithFields(log.Fields{"file": file,
+						"msg": msg, "pid": pid}).Error("Abonormal finish custom check script")
 					return false, msg, nil
 				}
 			}

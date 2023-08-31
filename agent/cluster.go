@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"time"
 	"strconv"
+	"time"
 
 	"github.com/neuvector/neuvector/share"
 	"github.com/neuvector/neuvector/share/cluster"
@@ -803,9 +803,20 @@ func clusterLoop(existing utils.Set) {
 		cluster.RegisterStoreWatcher(share.CLUSUniconfTargetStore(Host.ID), uniconfHandler, false)
 		cluster.RegisterStoreWatcher(share.CLUSNetworkStore, systemUpdateHandler, false)
 		cluster.RegisterStoreWatcher(share.CLUSNodeCommonProfileStore, systemUpdateHandler, agentEnv.kvCongestCtrl)
-		cluster.RegisterStoreWatcher(share.CLUSNodeProfileStoreKey(Host.ID), systemUpdateHandler, agentEnv.kvCongestCtrl)
+		cluster.RegisterStoreWatcher(share.CLUSNodeProfileStoreKey(Host.ID), systemUpdateHandler, false)
+		//cluster.RegisterStoreWatcher(share.CLUSNodeProfileStoreKey(Host.ID), systemUpdateHandler, agentEnv.kvCongestCtrl)
 		cluster.RegisterStoreWatcher(share.CLUSConfigDomainStore, domainConfigUpdate, false)
 		cluster.RegisterLeadChangeWatcher(leadChangeHandler, leadAddr)
+
+
+		log.WithFields(log.Fields{"share.CLUSNodeProfileStoreKey(Host.ID)": share.CLUSNodeProfileStoreKey(Host.ID)}).Error("JAYU dumping keys")
+
+
+		jayufn  := func (nType cluster.ClusterNotifyType, key string, value []byte, modifyIdx uint64) {
+			log.WithFields(log.Fields{"nType": nType, "key": key, "modifyIdx": modifyIdx}).Error("JAYU Capturing all profiles")
+		}
+		cluster.RegisterStoreWatcher(share.CLUSNodeStore, jayufn, false)
+
 	}()
 }
 
