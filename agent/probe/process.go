@@ -3347,3 +3347,23 @@ func (p *Probe) GetProcessInfo(pid int) (*procInternal, bool) {
 	mLog.WithFields(log.Fields{"pid": pid}).Debug("FA:")
 	return nil, false
 }
+                  Log.WithFields(log.Fields{"id": id, "path": path, "finfo": finfo}).Debug("FSN: not image file")
+			p.lockProcMux()
+			if c, ok := p.containerMap[id]; ok {
+				c.fInfo[path] = finfo
+			}
+			p.unlockProcMux()
+		}
+	}
+}
+
+func (p *Probe) GetProcessInfo(pid int) (*procInternal, bool) {
+	p.lockProcMux()
+	defer p.unlockProcMux()
+	if proc, ok := p.pidProcMap[pid]; ok {
+		mLog.WithFields(log.Fields{"name": proc.name, "pname": proc.pname, "pid": pid}).Debug("FA:")
+		return proc, true
+	}
+	mLog.WithFields(log.Fields{"pid": pid}).Debug("FA:")
+	return nil, false
+}
