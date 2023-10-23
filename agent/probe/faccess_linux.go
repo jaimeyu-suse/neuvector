@@ -134,7 +134,7 @@ func (fa *FileAccessCtrl) enumExecutables(rootpid int, id string) (map[string]in
 	}
 
 	if err != nil {
-		log.WithFields(log.Fields{"path": rootPath, "error": err}).Error("FA:")
+		log.WithFields(log.Fields{"path": rootPath, "error": err, "req": req, }).Debug("FA:")
 	}
 
 	for _, f := range res.Files {

@@ -1406,7 +1406,7 @@ func (b *Bench) runFindSecrets(rootPid int, name, id, group string) {
 
 	permBytes, secretBytes, err := walkerTask.RunWithTimeout(req, id, time.Duration(req.TimeoutSec)*time.Second)
 	if err != nil {
-		log.WithFields(log.Fields{"pid": rootPid, "id": id, "error": err}).Error()
+		log.WithFields(log.Fields{"pid": rootPid, "id": id, "error": err}).Debug()
 	} else {
 		if err = json.Unmarshal(secretBytes, &logs); err != nil {
 			log.WithFields(log.Fields{"data": string(secretBytes), "id": id, "error": err}).Error("logs")

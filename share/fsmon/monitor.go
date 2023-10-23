@@ -1043,7 +1043,8 @@ func (w *FileWatch) getDirFileList(pid int, base, regexStr, cid string, flt inte
 		}
 
 		if err != nil {
-			log.WithFields(log.Fields{"req": req, "error": err, "regexStr": regexStr, "any": any}).Error()
+			log.WithFields(log.Fields{"req": req, "error": err, "regexStr": regexStr, "any": any}).Debug()
+
 			dirs.Remove(any)
 			continue
 		}
@@ -1140,7 +1141,7 @@ func (w *FileWatch) getSubDirList(pid int, base, cid string) []string {
 	}
 
 	if err != nil {
-		log.WithFields(log.Fields{"path": startDir, "error": err}).Error()
+		log.WithFields(log.Fields{"path": startDir, "error": err}).Debug()
 	}
 
 	for _, d := range res.Dirs {
